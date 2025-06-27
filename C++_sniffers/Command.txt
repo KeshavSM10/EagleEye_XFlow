@@ -1,0 +1,6 @@
+cd "C:\Harshvardhan's_codes\XFlowAI\C++_sniffers"
+
+g++ main.c++ sniffer.c++ packet_handler.c++ Logger.c++ -I"C:\Users\WIN 11\Downloads\npcap-sdk-1.15\Include" -L"C:\Users\WIN 11\Downloads\npcap-sdk-1.15\Lib" -lwpcap -lPacket -lws2_32 -o main.exe
+
+
+and then .\main.exe
