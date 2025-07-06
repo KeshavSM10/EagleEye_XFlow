@@ -1,12 +1,13 @@
 #include <pcap.h>
 #include <iostream>
 #include <winsock2.h>
-#include<fstream>
+#include <fstream>
 #include "Logger.h"
 #include "Packet_Handler.h"
-#include<sstream>
-#include<iomanip>
-#include<string>
+#include <sstream>
+#include <iomanip>
+#include <string>
+#include <ranges>
 using namespace std;
 
 void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *header, const u_char *packet)
@@ -17,7 +18,7 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
 
     File_logging l;
 
-    l.add_to_file((to_string(header->caplen)+",").c_str());
+    l.add_to_file((to_string(header->caplen) + ",").c_str());
     for (int i = 0; i < header->caplen; i++)
     {
 
@@ -26,29 +27,31 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
 
     string mac_s = "";
     for (int i = 0; i < 6; i += 1)
-        {
-            char block[2];
-            sprintf(block, "%02x", packet[i]);
-            mac_s += block;
-            if (i != 5)
-                mac_s += ":";
-        }
+    {
+        char block[2];
+        sprintf(block, "%02x", packet[i]);
+        mac_s += block;
+        if (i != 5)
+            mac_s += ":";
+    }
     l.add_to_file(mac_s.c_str());
-    cout<<endl<<mac_s<<endl;
+    cout << endl
+         << mac_s << endl;
 
     l.add_to_file(",");
 
     string mac_d = "";
     for (int i = 6; i < 12; i += 1)
-        {
-            char block[2];
-            sprintf(block, "%02x", packet[i]);
-            mac_d += block;
-            if (i != 11)
-                mac_d += ":";
-        }
+    {
+        char block[2];
+        sprintf(block, "%02x", packet[i]);
+        mac_d += block;
+        if (i != 11)
+            mac_d += ":";
+    }
     l.add_to_file(mac_d.c_str());
-    cout<<endl<<mac_d<<endl;
+    cout << endl
+         << mac_d << endl;
 
     l.add_to_file(",");
 
@@ -56,18 +59,23 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
 
     uint16_t type = (packet[12] << 8) | packet[13];
     uint16_t port_source, port_dest;
-    int a = 0;
+    uint8_t a = 0;
     uint16_t IP_fragment_flag__offset, traffic_class;
 
     ostringstream oss;
-    oss<<"0x"<<setfill('0')<<setw(4)<<hex<<uppercase<<type;
+    oss << "0x" << setfill('0') << setw(4) << hex << uppercase << type;
 
     //--------------------------------------------------------------------------------------------------------------------------
+
+    in_addr addr_s, addr_d;
+    string ipv6_s = "";
+    string ipv6_d = "";
 
     if (type == 0x0800)
     {
 
-        cout << endl<< "IP Protocol: IPv4" << endl;
+        cout << endl
+             << "IP Protocol: IPv4" << endl;
         l.add_to_file(oss.str());
 
         a = packet[23];
@@ -91,11 +99,9 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
             break;
 
         default:
-            cout<<"Unidentified"<<endl;
-            l.add_to_file((string(",")+to_string(a)).c_str());
+            cout << "Unidentified" << endl;
+            l.add_to_file((string(",") + to_string(a)).c_str());
         }
-
-        in_addr addr_s, addr_d;
 
         memcpy(&addr_s, &packet[26], sizeof(in_addr));
         memcpy(&addr_d, &packet[30], sizeof(in_addr));
@@ -105,19 +111,19 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
         l.add_to_file((string(",") + inet_ntoa(addr_d)).c_str());
 
         l.add_to_file(",");
-        uint8_t dscp = (packet[15]&0xfc)>>2;
+        uint8_t dscp = (packet[15] & 0xfc) >> 2;
         l.add_to_file(to_string(dscp));
 
         l.add_to_file(",");
-        uint8_t ecn = packet[15]&0x03;
+        uint8_t ecn = packet[15] & 0x03;
         l.add_to_file(to_string(ecn));
 
-        uint8_t identity = (packet[18]<<8)|packet[19];
+        uint8_t identity = (packet[18] << 8) | packet[19];
         l.add_to_file(",");
         l.add_to_file(to_string(identity));
 
-        IP_fragment_flag__offset = ((packet[20]<<8)|packet[21]) & 0x1fff;
-        l.add_to_file(string("," + to_string(IP_fragment_flag__offset)+",,").c_str());
+        IP_fragment_flag__offset = ((packet[20] << 8) | packet[21]) & 0x1fff;
+        l.add_to_file(string("," + to_string(IP_fragment_flag__offset) + ",,").c_str());
     }
 
     //-----------------------------------------------------------------------------------------------------------------------------
@@ -125,22 +131,25 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
     else if (type == 0x86dd)
     {
 
-        cout<<endl << "IP Protocol: IPv6" << endl;
+        cout << endl
+             << "IP Protocol: IPv6" << endl;
 
         l.add_to_file(oss.str());
 
         int next_header = packet[20];
-        int offset = 14+40;
+        int offset = 14 + 40;
 
-        while(next_header != 6 && next_header != 17 && offset+2<header->len){
+        while (next_header != 6 && next_header != 17 && offset + 2 < header->len)
+        {
 
-            if(next_header == 58){
+            if (next_header == 58)
+            {
 
                 break;
             }
-            int ex_len = packet[offset+1];
-            int jump = (ex_len+1)*8;
-            offset = offset+jump;
+            int ex_len = packet[offset + 1];
+            int jump = (ex_len + 1) * 8;
+            offset = offset + jump;
             next_header = packet[offset];
         }
 
@@ -160,20 +169,19 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
             break;
 
         case 58:
-            cout<<" Packet Type: ICMPv6" << endl;
+            cout << " Packet Type: ICMPv6" << endl;
             l.add_to_file(",ICMPv6");
             break;
 
         case 33:
-            cout<<" DCCP"<<endl;
+            cout << " DCCP" << endl;
             l.add_to_file(",DCCP");
 
         default:
-            cout<<"UnIdentified"<<endl;
-            l.add_to_file((string(",")+to_string(a)).c_str());
+            cout << "UnIdentified" << endl;
+            l.add_to_file((string(",") + to_string(a)).c_str());
         }
 
-        string ipv6_s = "";
         for (int i = 22; i < 38; i += 2)
         {
             char block[5];
@@ -183,7 +191,6 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
                 ipv6_s += ":";
         }
 
-        string ipv6_d = "";
         for (int i = 38; i < 54; i += 2)
         {
             char block[5];
@@ -196,9 +203,9 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
         l.add_to_file((string(",") + ipv6_s).c_str());
         l.add_to_file((string(",") + ipv6_d).c_str());
 
-        traffic_class = ((packet[14] & 0x0f)<<4)|(packet[15]>>4);
+        traffic_class = ((packet[14] & 0x0f) << 4) | (packet[15] >> 4);
 
-        uint8_t dscp = (traffic_class & 0xfc)>>2;
+        uint8_t dscp = (traffic_class & 0xfc) >> 2;
         l.add_to_file(",");
         l.add_to_file(to_string(dscp));
 
@@ -206,14 +213,15 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
         uint8_t ecn = traffic_class & 0x03;
         l.add_to_file(to_string(ecn));
 
-        uint32_t flow_label = ((packet[15] & 0x0f)<<16)|(packet[16]<<8)|packet[17];
+        uint32_t flow_label = ((packet[15] & 0x0f) << 16) | (packet[16] << 8) | packet[17];
         l.add_to_file(",,,");
         l.add_to_file(to_string(traffic_class));
         l.add_to_file(",");
         l.add_to_file(to_string(flow_label));
     }
 
-    else {
+    else
+    {
 
         l.add_to_file(oss.str());
         l.add_to_file(",,,,,,,,,");
@@ -226,79 +234,82 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
     int extension_lenght = 0;
     int number_of_enxtensions = 0;
 
-    if(type == 0x0800){
+    if (type == 0x0800)
+    {
 
-        offset = (packet[14] & 0x0f)*4 + 14;
+        offset = (packet[14] & 0x0f) * 4 + 14;
 
-        if(a != 6 && a != 17){
+        if (a != 6 && a != 17)
+        {
 
-        l.add_to_file(",,");
+            l.add_to_file(",,");
         }
 
-        else {
-            port_source = (packet[offset]<<8)|packet[offset+1];
-            port_dest = (packet[offset+2]<<8)|packet[offset+3];
-            cout<<port_source<<endl;
-            l.add_to_file((string(",")+to_string(port_source)).c_str());
-            l.add_to_file((string(",")+to_string(port_dest)).c_str());
+        else
+        {
+            port_source = (packet[offset] << 8) | packet[offset + 1];
+            port_dest = (packet[offset + 2] << 8) | packet[offset + 3];
+            cout << port_source << endl;
+            l.add_to_file((string(",") + to_string(port_source)).c_str());
+            l.add_to_file((string(",") + to_string(port_dest)).c_str());
         }
 
         l.add_to_file(",,,");
     }
 
-    else if(type == 0x86dd){
+    else if (type == 0x86dd)
+    {
 
         uint8_t next_header = packet[20];
-        offset = 14+40;
+        offset = 14 + 40;
 
-        while(next_header != 6 && next_header != 17 && offset+2<header->len){
+        while (next_header != 6 && next_header != 17 && next_header != 58 && offset + 2 < header->len)
+        {
 
-            cout<<endl<<(int)next_header<<"-Extension "<<extension+"  SecD"<<endl;
-            
-            if(next_header == 58){
-                
-                break;
-            }
-            
-            if(next_header == 131){
-                
-                extension = extension+to_string(next_header)+":";
-                break;
-            }
-            
-            if(next_header == 255){
-                
-                break;
-            }
-            extension = extension+to_string(next_header)+":";
+            cout << endl
+                 << (int)next_header << "-Extension " << extension + "  SecD" << endl;
 
-            int ex_len = packet[offset+1];
-            int jump = (ex_len+1)*8;
-            offset = offset+jump;
-            extension_lenght = extension_lenght+jump;
+            extension = extension + to_string(next_header) + "-";
+
+            int ex_len = packet[offset + 1];
+            int jump = (ex_len + 1) * 8;
+
+            offset = offset + jump;
+            extension_lenght = extension_lenght + jump;
             number_of_enxtensions++;
+
             next_header = packet[offset];
         }
 
-        if(next_header == 6 || next_header == 17){
+        if (number_of_enxtensions > 0)
+        {
 
-            port_source = (packet[offset]<<8)|packet[offset+1];
-            port_dest = (packet[offset+2]<<8)|packet[offset+3];
-            cout<<port_source<<endl;
-            l.add_to_file((string(",")+to_string(port_source)).c_str());
-            l.add_to_file((string(",")+to_string(port_dest)).c_str());
+            offset = offset + (packet[offset + 1] + 1) * 8;
         }
 
-        else {
+        if (next_header == 6 || next_header == 17)
+        {
+
+            port_source = (packet[offset] << 8) | packet[offset + 1];
+            port_dest = (packet[offset + 2] << 8) | packet[offset + 3];
+            cout << port_source << endl;
+            l.add_to_file((string(",") + to_string(port_source)).c_str());
+            l.add_to_file((string(",") + to_string(port_dest)).c_str());
+        }
+
+        else
+        {
 
             l.add_to_file(",,");
         }
 
         l.add_to_file(",");
 
-        if(extension != ""){
+        if (extension != "")
+        {
             l.add_to_file(string(extension).c_str());
-            cout<<endl<<"Extension logged--> " <<extension<<endl;
+            cout << endl
+                 << "Extension logged--> " << extension << endl;
         }
 
         l.add_to_file(",");
@@ -307,206 +318,258 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
         l.add_to_file(to_string(number_of_enxtensions));
     }
 
-    else{
+    else
+    {
 
         l.add_to_file(",,,,,");
     }
 
+    cout << endl
+         << " ----->" << offset << endl;
+
     //---------------------------------------------------------------------------------------------------------------------------
 
-    if(type == 0x0800 || type == 0x86dd){
-        
-            l.add_to_file(",");
-            l.add_to_file(to_string(offset-14));
-        }
+    if (type == 0x0800 || type == 0x86dd)
+    {
 
-    else {
+        l.add_to_file(",");
+        l.add_to_file(to_string(offset - 14));
+    }
+
+    else
+    {
 
         l.add_to_file(",");
     }
 
     //----------------------------------------------------------------------------------------------------------------------------
 
-    if(a == 6){
+    if (a == 6)
+    {
         l.add_to_file(",");
-        l.add_to_file(to_string((packet[offset + 12] >> 4)*4));
+        l.add_to_file(to_string((packet[offset + 12] >> 4) * 4));
     }
 
-    else {
+    else
+    {
         l.add_to_file(",");
     }
-    
+
     //-----------------------------------------------------------------------------------------------------------------------------
 
-    if(type == 0x0800){
+    if (type == 0x0800)
+    {
 
-        l.add_to_file((string(",")+to_string((int)packet[22])).c_str());
+        l.add_to_file((string(",") + to_string((int)packet[22])).c_str());
         l.add_to_file(",");
     }
 
-    else if(type == 0x86dd){
+    else if (type == 0x86dd)
+    {
 
         l.add_to_file(",");
-        l.add_to_file((string(",")+to_string((int)packet[21])).c_str());
+        l.add_to_file((string(",") + to_string((int)packet[21])).c_str());
     }
 
-    else{
+    else
+    {
         l.add_to_file(",,");
     }
 
     //---------------------------------------------------------------------------------------------------------------------------------
 
     int len = 0;
-    if(type == 0x0800){
-        if(a == 6){
+    if (type == 0x0800)
+    {
+        if (a == 6)
+        {
 
-            if (offset + 13 < header->len){
-                len = 14+ (packet[14]&0x0f)*4 + (packet[offset + 12] >> 4)*4;
+            if (offset + 13 < header->len)
+            {
+                len = 14 + (packet[14] & 0x0f) * 4 + (packet[offset + 12] >> 4) * 4;
             }
 
-            l.add_to_file((string(",")+to_string(header->len - len)).c_str());
-        }
-        
-        else if(a == 17){
-
-            len = 14+ (packet[14]&0x0f)*4+8;
-            l.add_to_file((string(",")+to_string(header->len - len)).c_str());
+            l.add_to_file((string(",") + to_string(header->len - len)).c_str());
         }
 
-        else{
+        else if (a == 17)
+        {
+
+            len = 14 + (packet[14] & 0x0f) * 4 + 8;
+            l.add_to_file((string(",") + to_string(header->len - len)).c_str());
+        }
+
+        else
+        {
             l.add_to_file(",");
         }
     }
 
+    else if (type == 0x86dd)
+    {
 
-    else if(type == 0x86dd){
+        if (a == 6)
+        {
 
-        if(a == 6){
-
-            if (offset + 13 < header->len){
-                len = offset + (packet[offset + 12] >> 4)*4;
+            if (offset + 13 < header->len)
+            {
+                len = offset + (packet[offset + 12] >> 4) * 4;
             }
-            l.add_to_file((string(",")+to_string(header->len - len)).c_str());
-        }
-        
-        else if(a == 17){
-            len = offset+8;
-            l.add_to_file((string(",")+to_string(header->len - len)).c_str());
+            l.add_to_file((string(",") + to_string(header->len - len)).c_str());
         }
 
-        else{
+        else if (a == 17)
+        {
+            len = offset + 8;
+            l.add_to_file((string(",") + to_string(header->len - len)).c_str());
+        }
+
+        else
+        {
             l.add_to_file(",");
         }
     }
 
-    else{
+    else
+    {
 
         l.add_to_file(",");
     }
 
     //-------------------------------------------------------------------------------------------------------------------------
 
-    if(a == 6){
+    if (a == 6)
+    {
 
-        uint16_t window_size = (packet[offset+14]<<8) | packet[offset+15];
+        uint16_t window_size = (packet[offset + 14] << 8) | packet[offset + 15];
         l.add_to_file(",");
         l.add_to_file(to_string(window_size));
         l.add_to_file(",");
     }
 
-    else if(a == 17){
+    else if (a == 17)
+    {
 
-        uint16_t UDP_lenght = (packet[offset+4]<<8)|(packet[offset+5]);
+        uint16_t UDP_lenght = (packet[offset + 4] << 8) | (packet[offset + 5]);
         l.add_to_file(",,");
         l.add_to_file(to_string(UDP_lenght));
     }
 
-    else {
+    else
+    {
 
         l.add_to_file(",,");
     }
 
     //---------------------------------------------------------------------------------------------------------------------------
 
-    
-    l.add_to_file((","+to_string(header->ts.tv_sec)).c_str());
+    l.add_to_file(("," + to_string(header->ts.tv_sec)).c_str());
 
     //-------------------------------------------------------------------------------------------------------------------------------
 
-    if(a == 6){
+    if (a == 6)
+    {
 
-        if(type == 0x0800) l.add_to_file((string(",")+string("0x")+to_string((int)packet[offset+13])).c_str());
-        else if(type == 0x86dd) l.add_to_file((string(",")+string("0x")+to_string((int)packet[offset+13])).c_str());
-        else l.add_to_file(",");
+        l.add_to_file((string(",") + string("0x") + to_string((int)packet[offset + 13])).c_str());
     }
 
+    else
+    {
+
+        l.add_to_file(",");
+    }
     //-------------------------------------------------------------------------------------------------------------------------------
 
+    if (type == 0x86dd)
+    {
 
-    if(type == 0x86dd){
+        if (a == 6)
+        {
 
-        if(a == 6){
-
-            uint32_t SYCK = (packet[offset+4]<<24)|(packet[offset+5]<<16)|(packet[offset+6]<<8)|packet[offset+7];
+            uint32_t SYCK = (packet[offset + 4] << 24) | (packet[offset + 5] << 16) | (packet[offset + 6] << 8) | packet[offset + 7];
             string syck = to_string(SYCK);
-            cout<<endl<<"syck:"<<syck;
-            l.add_to_file((","+syck).c_str());
+            cout << endl
+                 << "syck:" << syck;
+            l.add_to_file(("," + syck).c_str());
 
-            uint32_t ACK = (packet[62]<<24)|(packet[63]<<16)|(packet[64]<<8)|packet[65];
+            uint32_t ACK = (packet[62] << 24) | (packet[63] << 16) | (packet[64] << 8) | packet[65];
             string ack = to_string(ACK);
-            cout<<endl<<"ack:"<<ack<<endl;
-            l.add_to_file((","+ack).c_str());
+            cout << endl
+                 << "ack:" << ack << endl;
+            l.add_to_file(("," + ack).c_str());
+        }
+
+        else
+        {
+
+            l.add_to_file(",,");
         }
     }
 
-    else if(type == 0x0800){
+    else if (type == 0x0800)
+    {
 
-        if(a == 6){
+        if (a == 6)
+        {
 
-            uint32_t SYCK = (packet[offset+4]<<24)|(packet[offset+5]<<16)|(packet[offset+6]<<8)|packet[offset+7];
+            uint32_t SYCK = (packet[offset + 4] << 24) | (packet[offset + 5] << 16) | (packet[offset + 6] << 8) | packet[offset + 7];
             string syck = to_string(SYCK);
-            cout<<endl<<"syck:"<<syck;
-            l.add_to_file((","+syck).c_str());
+            cout << endl
+                 << "syck:" << syck;
+            l.add_to_file(("," + syck).c_str());
 
-            uint32_t ACK = (packet[offset+8]<<24)|(packet[offset+9]<<16)|(packet[offset+10]<<8)|packet[offset+11];
+            uint32_t ACK = (packet[offset + 8] << 24) | (packet[offset + 9] << 16) | (packet[offset + 10] << 8) | packet[offset + 11];
             string ack = to_string(ACK);
-            cout<<endl<<"ack:"<<ack<<endl;
-            l.add_to_file((","+ack).c_str());
+            cout << endl
+                 << "ack:" << ack << endl;
+            l.add_to_file(("," + ack).c_str());
+        }
+
+        else
+        {
+
+            l.add_to_file(",,");
         }
     }
 
-    else{
+    else
+    {
 
         l.add_to_file(",,");
     }
 
     //---------------------------------------------------------------------------------------------------------------------------
 
-    if(((packet[offset+12]>>4)*4)>20){
+    if (((packet[offset + 12] >> 4) * 4) > 20 && a == 6)
+    {
 
-        int options_pointer = offset+20;
+        int options_pointer = offset + 20;
         string kind_list = "";
         int Number_of_options = 0;
-        int Lenght_of_options = ((packet[offset+12]>>4)*4)-20;
+        int Lenght_of_options = ((packet[offset + 12] >> 4) * 4) - 20;
 
-        while(packet[options_pointer] != 0){
+        while (packet[options_pointer] != 0)
+        {
 
-            kind_list = kind_list+to_string(packet[options_pointer])+":";
+            kind_list = kind_list + to_string(packet[options_pointer]) + ":";
 
-            if(packet[options_pointer] == 1){
+            if (packet[options_pointer] == 1)
+            {
 
                 Number_of_options++;
-                options_pointer = options_pointer+1;
-                if((options_pointer >= (packet[offset+12]>>4)*4)+offset){
+                options_pointer = options_pointer + 1;
+                if ((options_pointer >= (packet[offset + 12] >> 4) * 4) + offset)
+                {
 
                     break;
                 }
                 continue;
             }
 
-            int lenght = packet[options_pointer+1];
+            int lenght = packet[options_pointer + 1];
 
-            if(lenght<=2){
+            if (lenght <= 2)
+            {
 
                 break;
             }
@@ -514,23 +577,638 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
             options_pointer = options_pointer + lenght;
             Number_of_options++;
 
-            if((options_pointer >= (packet[offset+12]>>4)*4)+offset){
+            if ((options_pointer >= (packet[offset + 12] >> 4) * 4) + offset)
+            {
 
                 break;
             }
         }
 
-        l.add_to_file(string(",")+kind_list+string(",")+to_string(Lenght_of_options)+string(",")+to_string(Number_of_options).c_str());
+        l.add_to_file(string(",") + kind_list + string(",") + to_string(Lenght_of_options) + string(",") + to_string(Number_of_options).c_str());
     }
 
-    else {
+    else
+    {
 
         l.add_to_file(",,,");
     }
 
     //----------------------------------------------------------------------------------------------------------------------------
 
+    if (type == 0x0806)
+    {
 
+        uint16_t hard_t = (packet[14] << 8) | packet[15];
+        ostringstream har_t;
+        har_t << "0x" << setfill('0') << setw(4) << hex << uppercase << hard_t;
+        cout << har_t.str() << endl;
+        l.add_to_file((string(",") + har_t.str()).c_str());
+
+        uint16_t proto_t = (packet[16] << 8) | packet[17];
+        ostringstream prt;
+        prt << "0x" << setfill('0') << setw(4) << hex << uppercase << proto_t;
+        cout << prt.str() << endl;
+        l.add_to_file((string(",") + prt.str()).c_str());
+
+        uint8_t hardware_size = packet[18];
+        l.add_to_file((string(",") + to_string(hardware_size)).c_str());
+
+        uint8_t protocol_size = packet[19];
+        l.add_to_file((string(",") + to_string(protocol_size)).c_str());
+
+        uint16_t opcode_val = (packet[20] << 8) | packet[21];
+        l.add_to_file((string(",") + to_string(opcode_val)).c_str());
+
+        string sender_mac = "";
+        for (int i = 22; i < 28; i += 1)
+        {
+            char block[2];
+            sprintf(block, "%02x", packet[i]);
+            sender_mac += block;
+            if (i != 5)
+                sender_mac += ":";
+        }
+        l.add_to_file(",");
+        l.add_to_file(sender_mac);
+
+        in_addr senders_addr;
+        memcpy(&senders_addr, &packet[28], sizeof(in_addr));
+        l.add_to_file((string(",") + inet_ntoa(senders_addr)).c_str());
+
+        string target_mac = "";
+        for (int i = 32; i < 38; i += 1)
+        {
+            char block[2];
+            sprintf(block, "%02x", packet[i]);
+            target_mac += block;
+            cout << "-->" << target_mac << endl;
+            if (i != 5)
+                target_mac += ":";
+        }
+        l.add_to_file(",");
+        l.add_to_file(target_mac.c_str());
+
+        in_addr target_addr;
+        memcpy(&target_addr, &packet[38], sizeof(in_addr));
+        l.add_to_file((string(",") + inet_ntoa(target_addr)).c_str());
+    }
+
+    else
+    {
+
+        l.add_to_file(",,,,,,,,,");
+    }
+
+    //----------------------------------------------------------------------------------------------------------------------------
+
+    if (type == 0x0800 && a == 1)
+    {
+
+        int icmp_offset = 14 + (packet[14] & 0x0f) * 4;
+
+        uint8_t type = packet[icmp_offset];
+        l.add_to_file((string(",") + to_string(type)).c_str());
+
+        uint8_t code = packet[icmp_offset + 1];
+        l.add_to_file((string(",") + to_string(code)).c_str());
+
+        uint16_t checksum_t = (packet[icmp_offset + 2] << 8) | packet[icmp_offset + 3];
+        ostringstream checksum;
+        checksum << "0x" << setfill('0') << setw(4) << hex << uppercase << checksum_t;
+        l.add_to_file(",");
+        l.add_to_file(checksum.str());
+
+        uint16_t echo = (packet[icmp_offset + 4] << 8) | packet[icmp_offset + 5];
+        ostringstream echo_t;
+        echo_t << "0x" << setfill('0') << setw(4) << hex << uppercase << echo;
+        l.add_to_file(",");
+        l.add_to_file(echo_t.str());
+
+        uint16_t Sequence = (packet[icmp_offset + 6] << 8) | packet[icmp_offset + 7];
+        l.add_to_file((string(",") + to_string(Sequence)).c_str());
+    }
+
+    else if (type == 0x86dd && a == 58)
+    {
+
+        int icmp_offset = offset;
+
+        uint8_t type = packet[icmp_offset];
+        l.add_to_file((string(",") + to_string(type)).c_str());
+
+        uint8_t code = packet[icmp_offset + 1];
+        l.add_to_file((string(",") + to_string(code)).c_str());
+
+        uint16_t checksum_t = (packet[icmp_offset + 2] << 8) | packet[icmp_offset + 3];
+        ostringstream checksum;
+        checksum << "0x" << setfill('0') << setw(4) << hex << uppercase << checksum_t;
+        l.add_to_file(",");
+        l.add_to_file(checksum.str());
+
+        uint16_t echo = (packet[icmp_offset + 4] << 8) | packet[icmp_offset + 5];
+        ostringstream echo_t;
+        echo_t << "0x" << setfill('0') << setw(4) << hex << uppercase << echo;
+        l.add_to_file(",");
+        l.add_to_file(echo_t.str());
+
+        uint16_t Sequence = (packet[icmp_offset + 6] << 8) | packet[icmp_offset + 7];
+        l.add_to_file((string(",") + to_string(Sequence)).c_str());
+    }
+
+    else
+    {
+
+        l.add_to_file(",,,,,");
+    }
+
+    //--------------------------------------------------------------------------------------------------------------------------
+
+    if (a == 2 && type == 0x0800)
+    {
+
+        int igmp_offset = 14 + (packet[14] & 0x0f) * 4;
+
+        uint8_t type_x = packet[igmp_offset];
+        ostringstream type_x_i;
+        type_x_i << "0x" << setfill('0') << setw(2) << hex << uppercase << type_x;
+        l.add_to_file(",");
+        l.add_to_file(type_x_i.str());
+
+        uint8_t max_response = packet[igmp_offset + 1];
+        l.add_to_file((string(",") + to_string(max_response)).c_str());
+
+        uint16_t checksum_t = (packet[igmp_offset + 2] << 8) | packet[igmp_offset + 3];
+        ostringstream checksum;
+        checksum << "0x" << setfill('0') << setw(4) << hex << uppercase << checksum_t;
+        l.add_to_file(",");
+        l.add_to_file(checksum.str());
+
+        in_addr group_addr;
+        memcpy(&group_addr, &packet[igmp_offset + 4], sizeof(in_addr));
+        l.add_to_file((string(",") + inet_ntoa(group_addr)).c_str());
+    }
+
+    else
+    {
+
+        l.add_to_file(",,,,");
+    }
+
+    //--------------------------------------------------------------------------------------------------------------------------
+
+    int app_layer_offset = 0;
+    string L7_protocol;
+    int dst_port = port_dest;
+    int protocol = a;
+    string method = "";
+
+    string Logging = "";
+    string Protocol_SUMM = "";
+
+    string APP_LAYER_PROTOCOL = "";
+
+    if (a == 6)
+    {
+        app_layer_offset = offset + ((packet[offset + 12] & 0xf0) >> 4) * 4;
+    }
+    else if (a == 17)
+    {
+        app_layer_offset = offset + 8;
+    }
+
+    int payload = header->len - app_layer_offset;
+
+    if (payload >= 3 && packet[app_layer_offset] == 0x16 && packet[app_layer_offset + 1] == 0x03 && packet[app_layer_offset + 2] <= 0x03)
+    {
+        L7_protocol = "TLS Handshake";
+    }
+
+    if (payload <= 0)
+    {}
+
+    else
+    {
+        switch (a)
+        {
+        case 6:
+            for (int i = 0; i < payload; i++)
+            {
+                if (packet[app_layer_offset + i] <= 127)
+                {
+                    method += packet[app_layer_offset + i];
+                }
+            }
+
+            switch (dst_port)
+            {
+            case 80:
+            case 8080:
+            case 8000:
+            {
+                string payload_str(reinterpret_cast<const char *>(packet + app_layer_offset), payload);
+
+                if (payload_str.starts_with("GET") || payload_str.starts_with("POST") || payload_str.starts_with("PUT") ||
+                    payload_str.starts_with("DELETE") || payload_str.starts_with("HEAD") || payload_str.starts_with("HTTP/"))
+                {
+                    APP_LAYER_PROTOCOL = "HTTP";
+
+                    size_t space_pos = payload_str.find(' ');
+                    string http_method = (space_pos != string::npos) ? payload_str.substr(0, space_pos) : "UNKNOWN";
+
+                    size_t uri_start = space_pos + 1;
+                    size_t uri_end = payload_str.find(' ', uri_start);
+                    string uri = (uri_end != string::npos) ? payload_str.substr(uri_start, uri_end - uri_start) : "/";
+
+                    string host = "Unknown";
+                    size_t host_pos = payload_str.find("Host:");
+                    if (host_pos != string::npos)
+                    {
+                        size_t host_start = host_pos + 5;
+                        while (host_start < payload_str.length() && payload_str[host_start] == ' ')
+                            host_start++;
+                        size_t host_end = payload_str.find("\r\n", host_start);
+                        if (host_end == string::npos)
+                            host_end = payload_str.find("\n", host_start);
+                        host = (host_end != string::npos) ? payload_str.substr(host_start, host_end - host_start) : payload_str.substr(host_start);
+                    }
+
+                    string user_agent = "";
+                    size_t ua_pos = payload_str.find("User-Agent:");
+                    if (ua_pos != string::npos)
+                    {
+                        size_t ua_start = ua_pos + 11;
+                        while (ua_start < payload_str.length() && payload_str[ua_start] == ' ')
+                            ua_start++;
+                        size_t ua_end = payload_str.find("\r\n", ua_start);
+                        if (ua_end == string::npos)
+                            ua_end = payload_str.find("\n", ua_start);
+                        user_agent = (ua_end != string::npos) ? payload_str.substr(ua_start, ua_end - ua_start) : payload_str.substr(ua_start);
+                    }
+
+                    Protocol_SUMM = "HTTP Request - Method: " + http_method + " | URL: " + uri + " | Host: " + host;
+                    if (!user_agent.empty())
+                        Protocol_SUMM += " | User-Agent: " + user_agent;
+                }
+                break;
+            }
+
+            case 22: {
+                if (method.starts_with("SSH-"))
+                {
+                    APP_LAYER_PROTOCOL = "SSH";
+                    size_t version_end = method.find('\r');
+                    if (version_end == string::npos)
+                        version_end = method.find('\n');
+                    string version = (version_end != string::npos) ? method.substr(0, version_end) : method.substr(0, 50);
+                    Protocol_SUMM = "SSH Connection - Version: " + version;
+                }
+                break;
+            }
+
+            case 21: {
+                APP_LAYER_PROTOCOL = "FTP";
+                size_t line_end = method.find('\r');
+                if (line_end == string::npos)
+                    line_end = method.find('\n');
+                string ftp_command = (line_end != string::npos) ? method.substr(0, line_end) : method.substr(0, 100);
+                Protocol_SUMM = "FTP Command: " + ftp_command;
+                break;
+            }
+
+            case 25:
+            case 587:
+            {
+                if (method.starts_with("HELO") || method.starts_with("EHLO"))
+                {
+                    APP_LAYER_PROTOCOL = "SMTP";
+                    size_t space_pos = method.find(' ');
+                    string smtp_command = (space_pos != string::npos) ? method.substr(0, space_pos) : method;
+                    string smtp_domain = "";
+                    if (space_pos != string::npos)
+                    {
+                        size_t domain_start = space_pos + 1;
+                        size_t domain_end = method.find('\r', domain_start);
+                        if (domain_end == string::npos)
+                            domain_end = method.find('\n', domain_start);
+                        smtp_domain = (domain_end != string::npos) ? method.substr(domain_start, domain_end - domain_start) : method.substr(domain_start);
+                    }
+                    Protocol_SUMM = "SMTP Greeting - Command: " + smtp_command + " | Domain: " + smtp_domain;
+                }
+                else if (method.starts_with("MAIL FROM:"))
+                {
+                    APP_LAYER_PROTOCOL = "SMTP";
+                    size_t from_start = method.find("MAIL FROM:");
+                    string from_email = method.substr(from_start + 10);
+                    size_t line_end = from_email.find('\r');
+                    if (line_end != string::npos)
+                        from_email = from_email.substr(0, line_end);
+                    Protocol_SUMM = "SMTP Mail - From: " + from_email;
+                }
+                break;
+            }
+
+            case 110:{
+                if (method.starts_with("+OK"))
+                {
+                    APP_LAYER_PROTOCOL = "POP3";
+                    size_t line_end = method.find('\r');
+                    string pop3_response = (line_end != string::npos) ? method.substr(0, line_end) : method.substr(0, 100);
+                    Protocol_SUMM = "POP3 Response: " + pop3_response;
+                }
+                break;
+            }
+
+            case 143:{
+                if (method.starts_with("* OK"))
+                {
+                    APP_LAYER_PROTOCOL = "IMAP";
+                    size_t line_end = method.find('\r');
+                    string imap_response = (line_end != string::npos) ? method.substr(0, line_end) : method.substr(0, 100);
+                    Protocol_SUMM = "IMAP Response: " + imap_response;
+                }
+                break;
+            }
+
+            case 443:{
+                if (L7_protocol == "TLS Handshake")
+                {
+                    APP_LAYER_PROTOCOL = "HTTPS";
+                    uint8_t tls_version_major = packet[app_layer_offset + 1];
+                    uint8_t tls_version_minor = packet[app_layer_offset + 2];
+                    Protocol_SUMM = "HTTPS TLS Handshake - Version: " + to_string(tls_version_major) + "." + to_string(tls_version_minor);
+                }
+                else
+                {
+                    APP_LAYER_PROTOCOL = "Encrypted";
+                    Protocol_SUMM = "Encrypted HTTPS Traffic";
+                }
+                break;
+            }
+
+            default:
+                APP_LAYER_PROTOCOL = "UNIDENTIFIED";
+                break;
+            }
+            break;
+
+        case 17:
+            for (int i = 0; i < payload && i < 200; i++)
+            {
+                if (i >= payload)
+                    break;
+                if (packet[app_layer_offset + i] <= 127)
+                {
+                    char c = packet[app_layer_offset + i];
+                    method += c;
+                }
+            }
+
+            switch (dst_port)
+            {
+            case 53:
+                if (payload >= 12)
+                {
+                    APP_LAYER_PROTOCOL = "DNS";
+
+                    uint16_t transaction_id = (packet[app_layer_offset] << 8) | packet[app_layer_offset + 1];
+                    uint16_t flags = (packet[app_layer_offset + 2] << 8) | packet[app_layer_offset + 3];
+                    uint16_t questions = (packet[app_layer_offset + 4] << 8) | packet[app_layer_offset + 5];
+                    uint16_t answers = (packet[app_layer_offset + 6] << 8) | packet[app_layer_offset + 7];
+
+                    bool is_query = (flags & 0x8000) == 0;
+                    uint8_t opcode = (flags >> 11) & 0x0F;
+
+                    string domain_name = "";
+                    if (questions > 0 && payload > 12)
+                    {
+                        int name_offset = app_layer_offset + 12;
+                        while (name_offset < app_layer_offset + payload)
+                        {
+                            uint8_t len = packet[name_offset];
+                            if (len == 0)
+                                break;
+                            if (len > 63)
+                                break; 
+
+                            if (!domain_name.empty())
+                                domain_name += ".";
+                            for (int i = 0; i < len && name_offset + 1 + i < app_layer_offset + payload; i++)
+                            {
+                                domain_name += (char)packet[name_offset + 1 + i];
+                            }
+                            name_offset += len + 1;
+                        }
+                    }
+
+                    Protocol_SUMM = "DNS " + string(is_query ? "Query" : "Response") + " - Domain: " + domain_name +
+                                    " | Questions: " + to_string(questions) + " | Answers: " + to_string(answers) +
+                                    " | TxID: " + to_string(transaction_id);
+                }
+                break;
+
+            case 123: {
+                if (packet[app_layer_offset] == 0x1b)
+                {
+                    APP_LAYER_PROTOCOL = "NTP";
+                    uint8_t version = (packet[app_layer_offset] >> 3) & 0x7;
+                    uint8_t mode = packet[app_layer_offset] & 0x7;
+                    uint8_t stratum = packet[app_layer_offset + 1];
+
+                    string mode_str = "";
+                    switch (mode)
+                    {
+                    case 1:
+                        mode_str = "Symmetric Active";
+                        break;
+                    case 2:
+                        mode_str = "Symmetric Passive";
+                        break;
+                    case 3:
+                        mode_str = "Client";
+                        break;
+                    case 4:
+                        mode_str = "Server";
+                        break;
+                    case 5:
+                        mode_str = "Broadcast";
+                        break;
+                    default:
+                        mode_str = "Unknown(" + to_string(mode) + ")";
+                        break;
+                    }
+
+                    Protocol_SUMM = "NTP Packet - Version: " + to_string(version) + " | Mode: " + mode_str +
+                                    " | Stratum: " + to_string(stratum);
+                }
+                break;
+            }
+
+            case 161: {
+                if (packet[app_layer_offset] == 0x30)
+                {
+                    APP_LAYER_PROTOCOL = "SNMP";
+                    Protocol_SUMM = "SNMP Request - ASN.1 BER Encoded Message";
+                }
+                break;
+            }
+
+            case 67:
+            case 68: {
+                if (packet[app_layer_offset] == 0x01 || packet[app_layer_offset] == 0x02)
+                {
+                    APP_LAYER_PROTOCOL = "DHCP";
+                    uint8_t msg_type = packet[app_layer_offset];
+                    uint8_t hw_type = packet[app_layer_offset + 1];
+                    uint32_t transaction_id = (packet[app_layer_offset + 4] << 24) |
+                                              (packet[app_layer_offset + 5] << 16) |
+                                              (packet[app_layer_offset + 6] << 8) |
+                                              packet[app_layer_offset + 7];
+
+                    string client_mac = "";
+                    for (int i = 0; i < 6; i++)
+                    {
+                        if (i > 0)
+                            client_mac += ":";
+                        char hex[3];
+                        sprintf(hex, "%02x", packet[app_layer_offset + 28 + i]);
+                        client_mac += hex;
+                    }
+
+                    Protocol_SUMM = "DHCP " + string(msg_type == 0x01 ? "Request" : "Reply") +
+                                    " - Client MAC: " + client_mac + " | Transaction ID: 0x" +
+                                    to_string(transaction_id);
+                }
+                break;
+            }
+
+            case 443: // complex
+                break;
+
+            case 5060: {
+                if (method.starts_with("INVITE") || method.starts_with("ACK") || method.starts_with("BYE") ||
+                    method.starts_with("CANCEL") || method.starts_with("REGISTER"))
+                {
+                    APP_LAYER_PROTOCOL = "SIP";
+
+                    size_t space_pos = method.find(' ');
+                    string sip_method = (space_pos != string::npos) ? method.substr(0, space_pos) : method;
+                    string sip_uri = "";
+                    if (space_pos != string::npos)
+                    {
+                        size_t uri_start = space_pos + 1;
+                        size_t uri_end = method.find(' ', uri_start);
+                        if (uri_end == string::npos)
+                            uri_end = method.find('\r', uri_start);
+                        sip_uri = (uri_end != string::npos) ? method.substr(uri_start, uri_end - uri_start) : method.substr(uri_start);
+                    }
+
+                    string call_id = "";
+                    size_t call_id_pos = method.find("Call-ID:");
+                    if (call_id_pos != string::npos)
+                    {
+                        size_t id_start = call_id_pos + 8;
+                        while (id_start < method.length() && method[id_start] == ' ')
+                            id_start++;
+                        size_t id_end = method.find('\r', id_start);
+                        if (id_end == string::npos)
+                            id_end = method.find('\n', id_start);
+                        call_id = (id_end != string::npos) ? method.substr(id_start, id_end - id_start) : method.substr(id_start);
+                    }
+
+                    Protocol_SUMM = "SIP " + sip_method + " - URI: " + sip_uri;
+                    if (!call_id.empty())
+                        Protocol_SUMM += " | Call-ID: " + call_id;
+                }
+                break;
+            }
+
+            default: {
+                if (packet[app_layer_offset] == 0x80)
+                {
+                    APP_LAYER_PROTOCOL = "RTP";
+                    uint8_t version = (packet[app_layer_offset] >> 6) & 0x3;
+                    uint8_t payload_type = packet[app_layer_offset + 1] & 0x7F;
+                    uint16_t seq_num = (packet[app_layer_offset + 2] << 8) | packet[app_layer_offset + 3];
+                    uint32_t timestamp = (packet[app_layer_offset + 4] << 24) | (packet[app_layer_offset + 5] << 16) |
+                                         (packet[app_layer_offset + 6] << 8) | packet[app_layer_offset + 7];
+
+                    string payload_type_str = "";
+                    switch (payload_type)
+                    {
+                    case 0:
+                        payload_type_str = "PCMU";
+                        break;
+                    case 8:
+                        payload_type_str = "PCMA";
+                        break;
+                    case 96:
+                        payload_type_str = "Dynamic";
+                        break;
+                    default:
+                        payload_type_str = "Type " + to_string(payload_type);
+                        break;
+                    }
+
+                    Protocol_SUMM = "RTP Stream - Payload: " + payload_type_str + " | Sequence: " +
+                                    to_string(seq_num) + " | Timestamp: " + to_string(timestamp);
+                }
+                break;
+            }
+            }
+            break;
+        }
+    }
+
+    Logging += APP_LAYER_PROTOCOL;
+    Logging += ",";
+    Logging += Protocol_SUMM;
+    
+
+    cout<<endl<<"###############################################################################################"<<endl;
+    cout<<APP_LAYER_PROTOCOL<<" : "<<Protocol_SUMM<<endl;
+
+    //-------------------------------------------------------------------------------------------------------------------------
+
+    bool ACK = false;
+    bool RST = false;
+    bool SYN = false;
+    bool FIN = false;
+
+    if (a == 6)
+    {
+
+        uint8_t tcp_flags = packet[offset + 13];
+
+        ACK = tcp_flags & 0x10;
+        RST = tcp_flags & 0x04;
+        SYN = tcp_flags & 0x02;
+        FIN = tcp_flags & 0x01;
+    }
+
+    string srcip = (type == 0x86dd) ? ipv6_s : inet_ntoa(addr_s);
+    string dstip = (type == 0x86dd) ? ipv6_d : inet_ntoa(addr_d);
+
+    tracker.processPacket(srcip, dstip, port_source, port_dest, a, header->ts.tv_sec, header->ts.tv_sec, header->len, 1, (uint8_t)packet[21], (uint8_t)packet[22], ACK, SYN, RST, FIN, "");
+
+    tracker.updateMeta(srcip, header->ts.tv_sec, header->len);
+
+    tracker.expireFlow(time(0));
+
+    //---------------------------------------------------------------------------------------------------------------------------
+
+    tracker.log_to_csv(srcip,dstip,port_source,port_dest,a,Logging);
+
+    FlowStructHasher f_H;
+    FlowIdentifier f_I;
+    f_I.SrcIP = srcip;
+    f_I.DstIP = dstip;
+    f_I.SrcPort = port_source;
+    f_I.DstPort = port_dest;
+    f_I.Protocol = a;
+
+    size_t hash = f_H(f_I);
+    l.add_to_file(",");
+    l.add_to_file(to_string(hash));
 
     l.add_to_file("\n");
     l.add_to_file("end");
