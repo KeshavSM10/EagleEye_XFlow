@@ -7,6 +7,7 @@
 #pragma comment(lib, "ws2_32.lib")
 
 #include <iomanip>
+#include <chrono>
 
 #include "FlowTracker.h"
 #include <string>
@@ -18,10 +19,12 @@
 
 #include <iostream>
 #include <vector>
+#include<cmath>
 
 #include"Logger.h"
 
 using namespace std;
+using namespace std::chrono;
 
 //-------------------------------------------------------------------------------------------------------------------------------
 
@@ -105,7 +108,7 @@ size_t FlowStructHasher::operator()(const FlowIdentifier &other) const
 
 //-------------------------------------------------------------------------------------------------------------------------------
 
-void FlowTracker::processPacket(string SrcIP, string DstIP, uint16_t SrcPort, uint16_t DstPort, uint8_t protocol, time_t flowStart, time_t flowEnd, int packetSize, int TotalPackets, uint8_t ttl_min, uint8_t ttl_max, bool ack, bool syn, bool rst, bool fin, string direction) {
+void FlowTracker::processPacket(string SrcIP, string DstIP, uint16_t SrcPort, uint16_t DstPort, uint8_t protocol, nanoseconds flowStart, nanoseconds flowEnd, int packetSize, int TotalPackets, uint8_t ttl_min, uint8_t ttl_max, bool ack, bool syn, bool rst, bool fin, string direction) {
 
     FlowIdentifier f;
     f.SrcIP = SrcIP;
@@ -153,7 +156,7 @@ void FlowTracker::processPacket(string SrcIP, string DstIP, uint16_t SrcPort, ui
 
         auto &FlowDataPointer = Flow_iden->second;
 
-        time_t oldFlowEnd = FlowDataPointer.FlowEnd;
+        nanoseconds oldFlowEnd = FlowDataPointer.FlowEnd;
 
         FlowDataPointer.TotalPackets++;
         FlowDataPointer.TotalBytes += packetSize;
@@ -202,29 +205,29 @@ void FlowTracker::processPacket(string SrcIP, string DstIP, uint16_t SrcPort, ui
 
 //-------------------------------------------------------------------------------------------------------------------------------
 
-void FlowTracker::updateMeta(string srcIP, time_t curr_t, uint32_t size) {
+void FlowTracker::updateMeta(string srcIP, nanoseconds _t, uint32_t size) {
 
     auto meta_iden = metaData.find(srcIP);
     if (meta_iden == metaData.end()) {
 
         FlowMeta meta;
-        meta.LastSeen = curr_t;
+        meta.LastSeen = _t;
         meta.TotalBytes += size;
         meta.TotalPackets++;
-        meta.PacketsRecently.push_back(curr_t);
+        meta.PacketsRecently.push_back(_t);
         metaData[srcIP] = meta;
     }
 
     else {
 
         auto &meta_d = meta_iden->second;
-        meta_d.LastSeen = curr_t;
+        meta_d.LastSeen = _t;
         meta_d.TotalBytes += size;
         meta_d.TotalPackets++;
-        meta_d.PacketsRecently.push_back(curr_t);
+        meta_d.PacketsRecently.push_back(_t);
 
-        time_t window = 10;
-        while (!meta_d.PacketsRecently.empty() && curr_t - meta_d.PacketsRecently.front() > 10) {
+        nanoseconds window = nanoseconds(100);
+        while (!meta_d.PacketsRecently.empty() && _t - meta_d.PacketsRecently.front() > window) {
 
             meta_d.PacketsRecently.pop_front();
         }
@@ -236,7 +239,7 @@ void FlowTracker::updateMeta(string srcIP, time_t curr_t, uint32_t size) {
 
 //-------------------------------------------------------------------------------------------------------------------------------
 
-void FlowTracker::expireFlow(time_t now) {
+void FlowTracker::expireFlow(nanoseconds now) {
 
     auto it = timeIndex.begin();
     while (!timeIndex.empty() && now - TIME_OUT > it->first) {
@@ -258,6 +261,25 @@ void FlowTracker::expireFlow(time_t now) {
         metaData.erase(fID.SrcIP);
         it = timeIndex.erase(it);
     }
+}
+
+double FlowTracker::calculate_Entropy(const string& s) {
+    int n = s.size();
+    if (n == 0) return 0.0;
+
+    unordered_map<char, int> freq;
+    for (char c : s) {
+        freq[c]++;
+    }
+
+    double entropy = 0.0;
+
+    for (const auto& [ch, count] : freq) {
+        double prob = static_cast<double>(count) / n;
+        entropy -= prob * log2(prob);
+    }
+
+    return entropy;
 }
 
 void FlowTracker::log_to_csv(string SrcIP, string DstIP, uint16_t SrcPort, uint16_t DstPort, uint8_t protocol,string str) {
@@ -293,8 +315,8 @@ void FlowTracker::log_to_csv(string SrcIP, string DstIP, uint16_t SrcPort, uint1
         total_bytes_in_conversation += metaData[SrcIP].TotalBytes;
     }
 
-    l_FA.add_init(string(to_string(flowTable[_f].FlowStart) + ",").c_str());
-    l_FA.add_init(string(to_string(flowTable[_f].FlowEnd) + ",").c_str());
+    l_FA.add_init(string(to_string(flowTable[_f].FlowStart.count()) + ",").c_str());
+    l_FA.add_init(string(to_string(flowTable[_f].FlowEnd.count()) + ",").c_str());
     l_FA.add_init(string(to_string(flowTable[_f].TotalBytes) + ",").c_str());
     l_FA.add_init(string(to_string(flowTable[_f].ttl_min) + ",").c_str());
     l_FA.add_init(string(to_string(flowTable[_f].ttl_max) + ",").c_str());
@@ -306,13 +328,29 @@ void FlowTracker::log_to_csv(string SrcIP, string DstIP, uint16_t SrcPort, uint1
     l_FA.add_init(string(to_string(flowTable[_f].FIN) + ",").c_str());
     l_FA.add_init(string(to_string(total_bytes_in_conversation) + ",").c_str());
 
+    int64_t duration_ns = chrono::duration_cast<chrono::nanoseconds>(flowTable[_f].FlowEnd - flowTable[_f].FlowStart).count();
+
+    int64_t P_rate;
+    int64_t B_rate;
+
+    if (duration_ns != 0) {
+
+    P_rate = (flowTable[_f].TotalPackets * 1'000'000'000LL) / duration_ns;
+    B_rate = (flowTable[_f].TotalBytes   * 1'000'000'000LL) / duration_ns;
+    } 
+    
+    else {
+
+    P_rate = flowTable[_f].TotalPackets;
+    B_rate = flowTable[_f].TotalBytes;
+    }
+
+
+    l_FA.add_init(string(to_string(duration_ns) + ",").c_str());
+    l_FA.add_init(string(to_string(P_rate) + ",").c_str());
+    l_FA.add_init(string(to_string(B_rate) + ",").c_str());
+
     l_FA.add_init(str);
     l_FA.add_init("\n");
     l_FA.add_init("end");
 }
-
-
-
-//Source IP,Destination IP,Src Port,Dst Port,Protocol_L4,Flow Hash,Flow start,Flow End,Total Bytes from Src IP,
-//TTL MIN, TTL MAX,Total Packets from Src IP,Direction,SYN Flag,RST Flag,ACK Flag,FIN Flag,Total Bidirectional Bytes,APPLICATION LAYER PROTOCOL,
-//App layer port,Protocol Sprecific Information";

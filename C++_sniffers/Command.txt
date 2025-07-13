@@ -1,8 +1,5 @@
 cd "C:\Harshvardhan's_codes\XFlowAI\C++_sniffers"
 
-g++ -std=c++20 main.c++ sniffer.c++ packet_handler.c++ Logger.c++ FlowTracker.c++ 
--I"C:\Users\WIN 11\Downloads\npcap-sdk-1.15\Include" 
--L"C:\Users\WIN 11\Downloads\npcap-sdk-1.15\Lib\x64" 
--lwpcap -lPacket -lws2_32 -liphlpapi -o main.exe
+g++ -std=c++20 main.c++ sniffer.c++ packet_handler.c++ Logger.c++ FlowTracker.c++ -I"C:\Users\WIN 11\Downloads\npcap-sdk-1.15\Include" -L"C:\Users\WIN 11\Downloads\npcap-sdk-1.15\Lib\x64" -lwpcap -lPacket -lws2_32 -liphlpapi -o main.exe
 
 and then .\main.exe
