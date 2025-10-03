@@ -148,8 +148,13 @@ void FlowTracker::processPacket(string SrcIP, string DstIP, uint16_t SrcPort, ui
             newFlowIdentifierData.direction = "MULTICAST";
         }
 
+        newFlowIdentifierData.periodic_avg = 0;
+
         flowTable.emplace(f, newFlowIdentifierData);
         timeIndex.insert({flowEnd, f});
+        vector<FlowData> v;
+        v.push_back(newFlowIdentifierData);
+        Packet_list.emplace(f,v);
     }
 
     else {
@@ -193,10 +198,30 @@ void FlowTracker::processPacket(string SrcIP, string DstIP, uint16_t SrcPort, ui
             }
         }
 
+        FlowDataPointer.periodic_avg = (FlowDataPointer.periodic_avg + (FlowDataPointer.FlowEnd - oldFlowEnd).count())/(FlowDataPointer.TotalPackets - 1)*1000'000'000LL;
+
         timeIndex.insert({flowEnd, f});
+
+        FlowData fDD;
+        fDD.ACK = ack;
+        fDD.direction = FlowDataPointer.direction;
+        fDD.FIN = fin;
+        fDD.FlowEnd = flowEnd;
+        fDD.FlowStart = FlowDataPointer.FlowStart;
+        fDD.periodic_avg = FlowDataPointer.periodic_avg;
+        fDD.RST = rst;
+        fDD.SYN = syn;
+        fDD.TotalBytes = packetSize;
+        fDD.TotalPackets = 1;
+        fDD.ttl_max = ttl_max;
+        fDD.ttl_min = ttl_min;
+
+        Packet_list[f].push_back(fDD);
     }
 
-    cout << endl
+    
+
+    cout << endl 
          << "----------------------------------------------------------------------------------------------" << endl;
     cout << " ::ok   ::";
     cout << " :" << flowTable[f].FlowStart << " :" << flowTable[f].FlowEnd << " :" << flowTable[f].direction
@@ -308,7 +333,7 @@ void FlowTracker::log_to_csv(string SrcIP, string DstIP, uint16_t SrcPort, uint1
 
     l_FA.add_init(Log_in);
 
-    uint32_t total_bytes_in_conversation;
+    uint32_t total_bytes_in_conversation = 0;
     total_bytes_in_conversation += metaData[SrcIP].TotalBytes;
     if(metaData.find(DstIP) != metaData.end()) {
 
@@ -327,6 +352,7 @@ void FlowTracker::log_to_csv(string SrcIP, string DstIP, uint16_t SrcPort, uint1
     l_FA.add_init(string(to_string(flowTable[_f].ACK) + ",").c_str());
     l_FA.add_init(string(to_string(flowTable[_f].FIN) + ",").c_str());
     l_FA.add_init(string(to_string(total_bytes_in_conversation) + ",").c_str());
+    l_FA.add_init(string(to_string(flowTable[_f].periodic_avg) + ",").c_str());
 
     int64_t duration_ns = chrono::duration_cast<chrono::nanoseconds>(flowTable[_f].FlowEnd - flowTable[_f].FlowStart).count();
 

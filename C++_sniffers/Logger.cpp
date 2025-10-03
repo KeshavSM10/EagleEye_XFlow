@@ -58,7 +58,7 @@ void File_logging::add_init(const char* a) {
 
     if(wrote == false){
 
-        file<<"Source IP,Destination IP,Src Port,Dst Port,Protocol_L4,Flow Hash,Flow start,Flow End,Total Bytes from Src IP,TTL MIN, TTL MAX,Total Packets from Src IP,Direction,SYN Flag,RST Flag,ACK Flag,FIN Flag,Total Bidirectional Bytes,Total Conversational Duration,Packet Flow Rate,Bytes Flow Rate,APPLICATION LAYER PROTOCOL,Protocol Sprecific Information,Entropy\n";
+        file<<"Source IP,Destination IP,Src Port,Dst Port,Protocol_L4,Flow Hash,Flow start,Flow End,Total Bytes from Src IP,TTL MIN, TTL MAX,Total Packets from Src IP,Direction,SYN Flag,RST Flag,ACK Flag,FIN Flag,Total Bidirectional Bytes,Average In-packet period,Total Conversational Duration,Packet Flow Rate,Bytes Flow Rate,APPLICATION LAYER PROTOCOL,Protocol Sprecific Information,Entropy\n";
         wrote = true;
     }
 

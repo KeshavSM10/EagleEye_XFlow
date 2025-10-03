@@ -1,10 +1,11 @@
 // Initialization:
+
 #include <iostream>
 using namespace std;
 
 int Initialize(){
 
-    cout<<"Hello World";
+    cout<<"Hi! Visual Studio";
     return 0;
 }
 

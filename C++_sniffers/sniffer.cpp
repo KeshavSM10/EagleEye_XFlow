@@ -63,6 +63,9 @@ void sniffer::sniff_packets()
         exit(1);
     }
 
+    int dlt = pcap_datalink(handle);
+    cout << "Selected Device DLT Number: " << dlt << endl;
+
     pcap_loop(handle, 200, static_callback, reinterpret_cast<u_char *>(&handler));
 
     pcap_close(handle);

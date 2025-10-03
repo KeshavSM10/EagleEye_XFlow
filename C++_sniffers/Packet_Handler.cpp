@@ -27,7 +27,7 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
 
     string mac_s = "";
     for (int i = 0; i < 6; i += 1) {
-        char block[2];
+        char block[3];
         sprintf(block, "%02x", packet[i]);
         mac_s += block;
         if (i != 5)
@@ -43,7 +43,7 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
     string mac_d = "";
 
     for (int i = 6; i < 12; i += 1) {
-        char block[2];
+        char block[3];
         sprintf(block, "%02x", packet[i]);
         mac_d += block;
         if (i != 11)
@@ -112,17 +112,23 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
         l.add_to_file(",");
         uint8_t dscp = (packet[15] & 0xfc) >> 2;
         l.add_to_file(to_string(dscp));
+        // Kind of QoS.
 
         l.add_to_file(",");
         uint8_t ecn = packet[15] & 0x03;
         l.add_to_file(to_string(ecn));
+        // Congestion.
 
         uint8_t identity = (packet[18] << 8) | packet[19];
         l.add_to_file(",");
         l.add_to_file(to_string(identity));
+        //Unique Packet Id for identifying the group of fragments of a single IP datagram (16 bits) .
 
         IP_fragment_flag__offset = ((packet[20] << 8) | packet[21]) & 0x1fff;
         l.add_to_file(string("," + to_string(IP_fragment_flag__offset) + ",,").c_str());
+        // total fgarments or bytes ahead.
+
+        // ((packet[20] << 8) | packet[21]) & 0xd000 would yield specific flag.
     }
 
     //-----------------------------------------------------------------------------------------------------------------------------
@@ -148,6 +154,9 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
             int jump = (ex_len + 1) * 8;
             offset = offset + jump;
             next_header = packet[offset];
+
+            // in extensions, first 8 bit is next extension or header info, and consequent 8 bit is size of current extension, it is 
+            // (extentsion lenght  +  1)*8.
         }
 
         a = next_header;
@@ -199,6 +208,9 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
         l.add_to_file((string(",") + ipv6_d).c_str());
 
         traffic_class = ((packet[14] & 0x0f) << 4) | (packet[15] >> 4);
+        // The Traffic Class field indicates class or priority of IPv6 packet which is similar to Service Field in IPv4 packet.
+        // It helps routers to handle the traffic based on the priority of the packet.
+        // If congestion occurs on the router then packets with the least priority will be discarded. 
 
         uint8_t dscp = (traffic_class & 0xfc) >> 2;
         l.add_to_file(",");
@@ -213,6 +225,8 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
         l.add_to_file(to_string(traffic_class));
         l.add_to_file(",");
         l.add_to_file(to_string(flow_label));
+        //ram and shyam might be talking on say 10 different topics each with different frequency, 
+        //and each conversation has different identity, that identity is flow label
     }
 
     else {
@@ -318,6 +332,7 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
         l.add_to_file(",");
         l.add_to_file(to_string(offset - 14));
     }
+    //header lenght.
 
     else {
 
@@ -330,6 +345,7 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
         l.add_to_file(",");
         l.add_to_file(to_string((packet[offset + 12] >> 4) * 4));
     }
+    // TCP header lenght.
 
     else {
         l.add_to_file(",");
@@ -342,12 +358,14 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
         l.add_to_file((string(",") + to_string((int)packet[22])).c_str());
         l.add_to_file(",");
     }
+    //Time to live.
 
     else if (type == 0x86dd) {
 
         l.add_to_file(",");
         l.add_to_file((string(",") + to_string((int)packet[21])).c_str());
     }
+    //Hop Limit
 
     else {
         l.add_to_file(",,");
@@ -365,6 +383,7 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
 
             l.add_to_file((string(",") + to_string(header->len - len)).c_str());
         }
+        //Payload total.
 
         else if (a == 17) {
 
@@ -411,6 +430,7 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
         l.add_to_file(to_string(window_size));
         l.add_to_file(",");
     }
+    //This field tells the window size of the sending TCP in bytes. 
 
     else if (a == 17) {
 
@@ -418,6 +438,7 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
         l.add_to_file(",,");
         l.add_to_file(to_string(UDP_lenght));
     }
+    // UDP header.
 
     else {
 
@@ -432,6 +453,8 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
     l.add_to_file(string("," + to_string(time)).c_str());
     l.add_to_file(string("," + to_string(mono_now.count())).c_str());
 
+    //TIme stamp.
+
     //-------------------------------------------------------------------------------------------------------------------------------
 
     if (a == 6) {
@@ -443,6 +466,8 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
 
         l.add_to_file(",");
     }
+    // TCP Flags.
+
     //-------------------------------------------------------------------------------------------------------------------------------
 
     if (type == 0x86dd) {
@@ -496,7 +521,17 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
         l.add_to_file(",,");
     }
 
+    // ACK and SYCK Numbers
+
     //---------------------------------------------------------------------------------------------------------------------------
+
+    // TCP Dissection, Info, Kind, Options all.....
+
+    // TCP Options (Kind): 0-End, 1-NOP, 2-MSS, 3-WSopt, 4-SACK-Permitted, 5-SACK, 8-TSopt,
+    // 9-PAD, 14-AltChk, 15-Skeeter, 16-Bubba, 17-TrafficRateExp, 18-TrafficRate, 19-MC-TCP, 20-RVSP, 21-QS, 
+    // 22-UserTimeout, 23-TCP-AO, 24-CC, 25-CC.NEW, 26-CC.ECHO, 27-AltChkData, 28-TCP-Auth, 29-MultipathTCP, 
+    // 30-FastOpen, 69-Experimental
+
 
     if (((packet[offset + 12] >> 4) * 4) > 20 && a == 6) {
 
@@ -930,10 +965,118 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
                     uint8_t handshake_type = packet[app_layer_offset + 5];
 
                     string handshake_type_str = "";
-                    switch (handshake_type){
-                    case 1:
+                    string ja3_fingerprint = "";
+                    string sni_hostname = "";
+
+                    switch (handshake_type) {
+                    case 1: 
                         handshake_type_str = "Client Hello";
+
+                        try {
+                            int pos = app_layer_offset + 9; 
+
+                            pos += 34;
+
+                            uint8_t session_id_len = packet[pos++];
+                            pos += session_id_len;
+
+                            uint16_t cipher_suites_len = (packet[pos] << 8) | packet[pos + 1];
+                            pos += 2;
+
+                            vector<uint16_t> cipher_suites;
+                            for (int i = 0; i < cipher_suites_len; i += 2) {
+                                uint16_t cipher = (packet[pos + i] << 8) | packet[pos + i + 1];
+                                cipher_suites.push_back(cipher);
+                            }
+                            pos += cipher_suites_len;
+
+                            uint8_t compression_len = packet[pos++];
+                            pos += compression_len;
+
+                            uint16_t extensions_len = (packet[pos] << 8) | packet[pos + 1];
+                            pos += 2;
+
+                            vector<uint16_t> extensions;
+                            vector<uint16_t> elliptic_curves;
+                            vector<uint8_t> ec_point_formats;
+
+                            int ext_end = pos + extensions_len;
+                            while (pos < ext_end) {
+                                uint16_t ext_type = (packet[pos] << 8) | packet[pos + 1];
+                                uint16_t ext_len = (packet[pos + 2] << 8) | packet[pos + 3];
+                                pos += 4;
+
+                                extensions.push_back(ext_type);
+
+                                if (ext_type == 0 && sni_hostname.empty()) {
+                                    int sni_pos = pos + 2; 
+                                    uint8_t name_type = packet[sni_pos++];
+                                    uint16_t name_len = (packet[sni_pos] << 8) | packet[sni_pos + 1];
+                                    sni_pos += 2;
+
+                                    if (name_type == 0) { 
+                                        sni_hostname = string(reinterpret_cast<const char *>(&packet[sni_pos]), name_len);
+                                    }
+                                }
+
+                                else if (ext_type == 10) {
+                                    uint16_t list_len = (packet[pos] << 8) | packet[pos + 1];
+                                    int curve_pos = pos + 2;
+                                    for (int i = 0; i < list_len; i += 2) {
+                                        uint16_t curve = (packet[curve_pos + i] << 8) | packet[curve_pos + i + 1];
+                                        elliptic_curves.push_back(curve);
+                                    }
+                                }
+
+                                else if (ext_type == 11) {
+                                    uint8_t formats_len = packet[pos];
+                                    for (int i = 0; i < formats_len; i++) {
+                                        ec_point_formats.push_back(packet[pos + 1 + i]);
+                                    }
+                                }
+
+                                pos += ext_len;
+                            }
+
+                            string ja3_string = to_string((tls_version_major << 8) | tls_version_minor) + ",";
+
+                            for (size_t i = 0; i < cipher_suites.size(); i++) {
+                                ja3_string += to_string(cipher_suites[i]);
+                                if (i < cipher_suites.size() - 1)
+                                    ja3_string += "-";
+                            }
+                            ja3_string += ",";
+
+                            for (size_t i = 0; i < extensions.size(); i++) {
+                                ja3_string += to_string(extensions[i]);
+                                if (i < extensions.size() - 1)
+                                    ja3_string += "-";
+                            }
+                            ja3_string += ",";
+
+                            for (size_t i = 0; i < elliptic_curves.size(); i++) {
+                                ja3_string += to_string(elliptic_curves[i]);
+                                if (i < elliptic_curves.size() - 1)
+                                    ja3_string += "-";
+                            }
+                            ja3_string += ",";
+
+                            for (size_t i = 0; i < ec_point_formats.size(); i++) {
+                                ja3_string += to_string(ec_point_formats[i]);
+                                if (i < ec_point_formats.size() - 1)
+                                    ja3_string += "-";
+                            }
+
+                            hash<string> hasher;
+                            size_t hash_value = hasher(ja3_string);
+                            stringstream ss;
+                            ss << hex << hash_value;
+                            ja3_fingerprint = ss.str();
+                        }
+                        catch (...){}
+
                         break;
+
                     case 2:
                         handshake_type_str = "Server Hello";
                         break;
@@ -956,12 +1099,19 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
 
                     Protocol_SUMM = "HTTPS TLS Handshake - Version: " + to_string(tls_version_major) + "." + to_string(tls_version_minor) + " | Type: " + handshake_type_str;
 
+                    if (!sni_hostname.empty()) {
+                        Protocol_SUMM += " | SNI: " + sni_hostname;
+                    }
+
+                    if (!ja3_fingerprint.empty()) {
+                        Protocol_SUMM += " | JA3: " + ja3_fingerprint.substr(0, 16) + "...";
+                    }
+
                     Entrp = to_string(tls_version_major) + to_string(tls_version_minor) + to_string(handshake_type) + "TLS";
                 }
                 else {
                     APP_LAYER_PROTOCOL = "Encrypted";
                     Protocol_SUMM = "Encrypted HTTPS Traffic";
-
                     Entrp = "ENCRYPTED" + to_string(dst_port) + to_string(payload);
                 }
             }
@@ -972,15 +1122,13 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
                 string telnet_data = "";
                 bool has_telnet_commands = false;
 
-                for (int i = 0; i < payload && i < 100; i++)
-                {
-                    if (packet[app_layer_offset + i] == 0xFF)
-                    {
+                for (int i = 0; i < payload && i < 100; i++) {
+                    if (packet[app_layer_offset + i] == 0xFF) {
                         has_telnet_commands = true;
                         break;
                     }
-                    if (packet[app_layer_offset + i] >= 32 && packet[app_layer_offset + i] <= 126)
-                    {
+
+                    if (packet[app_layer_offset + i] >= 32 && packet[app_layer_offset + i] <= 126) {
                         telnet_data += (char)packet[app_layer_offset + i];
                     }
                 }
@@ -991,8 +1139,7 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
                 Entrp = telnet_data + to_string(has_telnet_commands) + to_string(dst_port);
             }
 
-            else
-            {
+            else {
                 APP_LAYER_PROTOCOL = "UNIDENTIFIED";
             }
 
@@ -1004,17 +1151,15 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
             {
                 if (i >= payload)
                     break;
-                if (packet[app_layer_offset + i] <= 127)
-                {
+
+                if (packet[app_layer_offset + i] <= 127) {
                     char c = packet[app_layer_offset + i];
                     method += c;
                 }
             }
 
-            if (dst_port == 53 || src_port == 53)
-            {
-                if (payload >= 12)
-                {
+            if (dst_port == 53 || src_port == 53) {
+                if (payload >= 12) {
                     APP_LAYER_PROTOCOL = "DNS";
 
                     uint16_t transaction_id = (packet[app_layer_offset] << 8) | packet[app_layer_offset + 1];
@@ -1408,6 +1553,8 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
     double entr = tracker.calculate_Entropy(Entrp);
     Logging += to_string(entr);
 
+    Logging += ",";
+
     cout << endl
          << "###############################################################################################" << endl;
     cout << APP_LAYER_PROTOCOL << " : " << Protocol_SUMM <<" : entr :"<<entr<< endl;
@@ -1453,6 +1600,7 @@ void Packet_Handler::handle_packet(u_char *username, const struct pcap_pkthdr *h
     f_I.SrcPort = port_source;
     f_I.DstPort = port_dest;
     f_I.Protocol = a;
+
 
     size_t hash = f_H(f_I);
     l.add_to_file(",");

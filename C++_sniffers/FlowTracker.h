@@ -30,6 +30,7 @@ struct FlowData
     bool ACK, SYN, RST, FIN;
     string direction;
     string apProtocol;
+    double periodic_avg;
 };
 
 struct FlowMeta
@@ -86,6 +87,9 @@ public:
     void log_to_csv(string SrcIP, string DstIP, uint16_t SrcPort, uint16_t DstPort, uint8_t protocol,string str);
 
     double calculate_Entropy(const string& s);
+    unordered_map<FlowIdentifier, vector<FlowData>, FlowStructHasher> Packet_list;
+
+    //unordered_map <chrono::nanoseconds time, pair<uint64_t, uint64_t>> Agg_Data;
 
 private:
     unordered_map<FlowIdentifier, FlowData, FlowStructHasher> flowTable;

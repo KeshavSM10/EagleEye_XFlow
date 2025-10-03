@@ -1,0 +1,10 @@
+cd "C:\Harshvardhan's_codes\XFlowAI\C++_sniffers"
+
+g++ -std=c++20 main.cpp sniffer.cpp packet_handler.cpp Logger.cpp FlowTracker.cpp -I"C:\Users\WIN 11\Downloads\npcap-sdk-1.15\Include" -L"C:\Users\WIN 11\Downloads\npcap-sdk-1.15\Lib\x64" -lwpcap -lPacket -lws2_32 -liphlpapi -o main.exe
+
+and then .\main.exe
+
+for Data analyzer
+
+g++ acall.cpp -o acall -I"C:/vcpkg/installed/x64-windows/include" -L"C:/vcpkg/installed/x64-windows/lib" -lcurl
+
