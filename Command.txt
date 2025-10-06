@@ -8,3 +8,35 @@ for Data analyzer
 
 g++ acall.cpp -o acall -I"C:/vcpkg/installed/x64-windows/include" -L"C:/vcpkg/installed/x64-windows/lib" -lcurl
 
+g++ -std=c++17 main.cpp read_data.cpp -o main -I"C:/vcpkg/installed/x64-windows/include"
+
+
+//-------------------g++ -std=c++20 main.cpp \
+    C++_sniffers/sniffer.cpp \
+    C++_sniffers/packet_handler.cpp \
+    C++_sniffers/Logger.cpp \
+    C++_sniffers/FlowTracker.cpp \
+    Data_Analyzers/acall.cpp \
+    Data_Analyzers/read_data.cpp \
+    -I"C:/Users/WIN11/Downloads/npcap-sdk-1.15/Include" \
+    -I"C:/vcpkg/installed/x64-windows/include" \
+    -L"C:/Users/WIN11/Downloads/npcap-sdk-1.15/Lib/x64" \
+    -L"C:/vcpkg/installed/x64-windows/lib" \
+    -lwpcap -lPacket -lws2_32 -liphlpapi -lcurl -o XFlowAI.exe----------------------------//
+
+g++ -std=c++20 main.cpp ^
+C++_sniffers/sniffer.cpp ^
+C++_sniffers/packet_handler.cpp ^
+C++_sniffers/Logger.cpp ^
+C++_sniffers/FlowTracker.cpp ^
+Data_Analyzers/acall.cpp ^
+Data_Analyzers/read_data.cpp ^
+-I"C:/Users/WIN 11/Downloads/npcap-sdk-1.15/Include" ^
+-I"C:/vcpkg/installed/x64-windows/include" ^
+-L"C:/Users/WIN 11/Downloads/npcap-sdk-1.15/Lib/x64" ^
+-L"C:/vcpkg/installed/x64-windows/lib" ^
+-lwpcap -lPacket -lws2_32 -liphlpapi -lcurl -o XFlowAI.exe
+
+
+type nul > "C:\Harshvardhan's_codes\XFlowAI\low.csv"
+type nul > "C:\Harshvardhan's_codes\XFlowAI\flow_app.csv"
